@@ -4,26 +4,16 @@ import cv2
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
 import io
-import base64
 
 st.set_page_config(page_title="Image Spot Eraser", layout="centered")
 
 st.title("🖌️ Image Spot Eraser Tool")
 
-# Function to convert image → base64
-def pil_to_base64(img):
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    return base64.b64encode(buf.getvalue()).decode()
-
-# Upload image
 uploaded_file = st.file_uploader("Upload an image", type=["png", "jpg", "jpeg"])
 
 if uploaded_file is not None:
     # Load image
-    image = Image.open(uploaded_file).convert("RGBA")
-
-    # Resize (important)
+    image = Image.open(uploaded_file).convert("RGB")
     image.thumbnail((512, 512))
 
     img_array = np.array(image)
@@ -31,21 +21,17 @@ if uploaded_file is not None:
     st.subheader("Original Image")
     st.image(image, use_column_width=True)
 
+    st.subheader("Draw area to erase (same position as image)")
+
     # Brush size
     brush_size = st.slider("Brush Size", 5, 50, 20)
 
-    # Convert image → base64 (🔥 KEY FIX)
-    img_base64 = pil_to_base64(image)
-
-    st.subheader("Draw over the area you want to erase")
-
-    # Canvas (FINAL FIX)
+    # Blank canvas (NO background_image → avoids crash)
     canvas_result = st_canvas(
         fill_color="rgba(255, 0, 0, 0.3)",
         stroke_width=brush_size,
         stroke_color="white",
-        background_image=img_base64,  # ✅ FIXED HERE
-        update_streamlit=True,
+        background_color="rgba(0,0,0,0)",  # transparent
         height=image.height,
         width=image.width,
         drawing_mode="freedraw",
@@ -59,11 +45,8 @@ if uploaded_file is not None:
 
         mask = cv2.resize(mask, (img_array.shape[1], img_array.shape[0]))
 
-        # Convert RGBA → RGB
-        img_rgb = cv2.cvtColor(img_array, cv2.COLOR_RGBA2RGB)
-
         # Inpaint
-        result = cv2.inpaint(img_rgb, mask, 3, cv2.INPAINT_TELEA)
+        result = cv2.inpaint(img_array, mask, 3, cv2.INPAINT_TELEA)
 
         st.subheader("🧼 Erased Image")
         st.image(result, use_column_width=True)
